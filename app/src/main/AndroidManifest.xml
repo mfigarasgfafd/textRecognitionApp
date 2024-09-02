@@ -23,7 +23,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
+            android:label="Simple Text Recognition"
             android:theme="@style/Theme.MLKIT_app">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
