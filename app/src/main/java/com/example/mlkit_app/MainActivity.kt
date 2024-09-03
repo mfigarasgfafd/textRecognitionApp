@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
@@ -26,6 +27,7 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -55,7 +57,11 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.util.concurrent.Executors
-
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.Color
+import androidx.core.content.FileProvider
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -88,24 +94,70 @@ fun MainScreen() {
         onResult = { result -> handleDocumentScanningResult(result, textResult, context) }
     )
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.75f)  // Set the drawer width to 75% of the screen width
+                    .fillMaxHeight(),
+                color = Color.Black.copy(alpha = 0.8f) // Set background color to 80% opacity black
+            ) {
+                DrawerContent(context = context)
+            }
+        }
     ) {
-        CameraPreview(
-            textResult = textResult,
-            isCameraFrozen = isCameraFrozen,
-            frozenBitmap = frozenBitmap,
-            useDocumentScanner = useDocumentScanner,
-            scannerLauncher = scannerLauncher
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        TextViewPlaceholder(text = textResult.value)
-        CopyTextButton(text = textResult.value)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+        ) {
+            CameraPreview(
+                textResult = textResult,
+                isCameraFrozen = isCameraFrozen,
+                frozenBitmap = frozenBitmap,
+                useDocumentScanner = useDocumentScanner,
+                scannerLauncher = scannerLauncher
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            TextViewPlaceholder(text = textResult.value)
+            CopyTextButton(text = textResult.value)
+        }
     }
 }
 
+@Composable
+fun DrawerContent(context: Context) {
+    val documentsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+    val pdfFiles = documentsDir.listFiles { _, name -> name.endsWith(".pdf") }?.toList() ?: emptyList()
+
+    LazyColumn(modifier = Modifier.padding(16.dp)) {
+        items(pdfFiles) { file ->
+            Text(
+                text = file.name,
+                color = Color.White,  // Set text color to white for contrast
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+                    .clickable {
+                        openPdfFile(context, file)
+                    }
+            )
+        }
+    }
+}
+
+fun openPdfFile(context: Context, file: File) {
+    val uri: Uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, "application/pdf")
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(intent)
+}
 @Composable
 fun TextViewPlaceholder(text: String) {
     Text(
@@ -113,25 +165,7 @@ fun TextViewPlaceholder(text: String) {
         modifier = Modifier.padding(16.dp)
     )
 }
-@RequiresApi(Build.VERSION_CODES.Q)
-fun savePdfToDocumentsScopedStorage(context: Context, pdfData: ByteArray, fileName: String): Uri? {
-    val contentValues = ContentValues().apply {
-        put(MediaStore.MediaColumns.DISPLAY_NAME, "$fileName.pdf")
-        put(MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
-        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOCUMENTS)
-    }
 
-    val resolver = context.contentResolver
-    val uri = resolver.insert(MediaStore.Files.getContentUri("external"), contentValues)
-
-    uri?.let {
-        resolver.openOutputStream(it)?.use { outputStream ->
-            outputStream.write(pdfData)
-        }
-    }
-
-    return uri
-}
 @SuppressLint("UnsafeOptInUsageError")
 @Composable
 fun CameraPreview(
@@ -302,7 +336,8 @@ private fun launchDocumentScanner(
     scannerLauncher: ActivityResultLauncher<IntentSenderRequest>
 ) {
     val options = GmsDocumentScannerOptions.Builder()
-        .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_BASE_WITH_FILTER)
+//        BASE_WITH_FILTER
+        .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
         .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_PDF)
         .setGalleryImportAllowed(true)  // Enable gallery import if needed
         .build()
