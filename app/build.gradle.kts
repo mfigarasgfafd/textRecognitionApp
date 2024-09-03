@@ -90,4 +90,7 @@ dependencies {
     implementation ("androidx.compose.ui:ui-tooling-preview:1.5.0")
     implementation ("androidx.lifecycle:lifecycle-runtime-ktx:2.6.1")
     implementation ("com.google.mlkit:text-recognition:16.0.1")
+    implementation ("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0-beta1")
+
+
 }
